@@ -1,0 +1,47 @@
+name: Build and push docker image
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'k3s-manifest-files/**' # Avoid triggering pipeline if you only update manifest files
+
+# Permissions to request the OIDC JWT token
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v4 
+
+    # Authenticate to AWS using your new OIDC Role ARN
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::133850321524:role/Nexora-OIDC
+        aws-region: us-east-1   # <-- ECR registry region
+        audience: sts.amazonaws.com # <-- Tells GitHub to issue the exact token format AWS expects
+
+    # Login to Amazon ECR
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # Build, tag, and push using specific ECR repository details
+    - name: Docker build and push
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: nexora-webapp
+        IMAGE_TAG: v${{ github.run_number }}
+      run: | 
+        # Build the container locally on the GitHub runner
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:dev .
+        
+        # Push both the incremental version tag and the static dev tag
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:dev
