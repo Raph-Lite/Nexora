@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+  name: nexxa-dev-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+    
+spec:
+  tls:
+  - hosts:
+    - ://yourdomain.com  
+    secretName: nexxa-dev-tls-secret
+  rules:
+  - host: ://yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexxa-dev-service
+            port:
+              number: 80
